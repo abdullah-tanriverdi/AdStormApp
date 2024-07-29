@@ -1,6 +1,5 @@
 package com.tanriverdi.adstormeterna;
 
-
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -9,79 +8,138 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.util.Log;
 import android.widget.Toast;
+
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
+import io.socket.client.IO;
+import io.socket.client.Socket;
+import io.socket.emitter.Emitter;
 
-public class ForegroundService extends Service { //Foreground sınıfı Service sınıfından türetildi
+public class ForegroundService extends Service {
 
-    private static final String CHANNEL_ID = "SimpleServiceChannel"; //Bildirim kanalı için sabit ID
+    private static final String CHANNEL_ID = "SimpleServiceChannel";
+    private Handler handler;
+    private Runnable runnable;
+    private Socket mSocket;
+    private boolean isConnected = false;
 
-    private Handler handler; // Handler nesnesi
-    private Runnable runnable; // Runnable nesnesi
-
-    public void onCreate(){ //Servis oluşturulduğunda çağrılır
-        super.onCreate(); //Üst sınıfın onCreate metodunu çağırır
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){ //Oreo ve üstü sürümler için
-            createNotificationChannel();// Bildirim kanalını oluşturur
+    {
+        try {
+            // Socket.IO sunucu adresi belirlenir
+            mSocket = IO.socket("https://pcwa-e079d7711976.herokuapp.com/");
+        } catch (Exception e) {
+            // Socket.IO bağlantısı oluşturulurken bir hata oluşursa burada yakalanır
+            e.printStackTrace();
         }
+    }
 
-        Notification notification = new NotificationCompat.Builder(this,CHANNEL_ID) //Bildirimi oluşturur
-                .setContentTitle("Background Service") // Bildirim başlığını ayarlar
-                .setContentText("Service is running in the background") //Bildirim içeriğini ayarlar
-                .setSmallIcon(R.drawable.baseline_accessibility_24) //Bildirim ikonunu ayarlar
-                .build(); // Bildirimi oluşturur
+    @Override
+    public void onCreate() {
+        super.onCreate();
 
-        startForeground(1,notification); //Servisi ön planda başlat ve bildirimi göster
+        // Android O ve üstü sürümlerde bildirim kanalını oluştur
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            createNotificationChannel();
+        }
+        // Bildirim kanalı ilerleyen safhalarda ping event ile sunucuya mesaj gönderecek şekilde ayarlanacaktır.
+        // Foreground servisi için bir bildirim oluşturuluyor
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("Background Service")
+                .setContentText("Service is running in the background")
+                .setSmallIcon(R.drawable.baseline_accessibility_24) // Küçük simge (ikon)
+                .build();
 
-        handler = new Handler(); // Yeni bir handler nesnesi oluşturur
-        runnable = new Runnable() { //Yeni bir runnable nesnesi oluşturur
+        // Servis foreground olarak başlatılır
+        startForeground(1, notification);
+
+
+        // İlerleyen dönemlerde kaldırılacaktır
+        // Handler ve Runnable ile periyodik işlemler yapılır
+        handler = new Handler();
+        runnable = new Runnable() {
             @Override
-            public void run() { //Runnable içeriği
-                Toast.makeText(ForegroundService.this,"Servise is running...",Toast.LENGTH_SHORT).show(); //Her çalıştırıldığında toast mesajı gönderir
-                handler.postDelayed(this,10000); // 10 saniye sonra tekrar çalıştır
-
+            public void run() {
+                // Sunucu bağlantısını kontrol eder
+                if (isConnected) {
+                    Toast.makeText(ForegroundService.this, "Connected to server", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(ForegroundService.this, "Not connected to server", Toast.LENGTH_SHORT).show();
+                }
+                handler.postDelayed(this, 5000); // 5 saniye sonra tekrar çalıştır
             }
         };
-        handler.post(runnable); //Runnable' ı başlatır
+        handler.post(runnable);
 
+        // Socket.IO bağlantısını başlat
+        if (mSocket != null) {
+            mSocket.connect();
+            mSocket.on(Socket.EVENT_CONNECT, new Emitter.Listener() {
+                @Override
+                public void call(Object... args) {
+                    // Bağlantı başarılı olduğunda tetiklenir
+                    Log.d("Socket", "Connected to server");
+                    isConnected = true;
+                }
+            }).on(Socket.EVENT_DISCONNECT, new Emitter.Listener() {
+                @Override
+                public void call(Object... args) {
+                    // Bağlantı kesildiğinde tetiklenir
+                    Log.d("Socket", "Disconnected from server");
+                    isConnected = false;
+                }
+            }).on("your_event", new Emitter.Listener() {
+                @Override
+                public void call(Object... args) {
+                    // Sunucudan gelen özel veriyi işler
+                    Log.d("Socket", "Received data: " + args[0]);
+                }
+            });
+        }
     }
+
     @Override
-    public int onStartCommand (Intent intent , int flags , int startId){ //Servis başlatıldığında çağrılır
-        return START_STICKY; //Servisin yeniden başlatılması durumunda bile çalışmaya devam edilmesini sağlar
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        // Servis yeniden başlatıldığında sürekli çalışmasını sağlar
+        return START_STICKY;
     }
 
     @Override
-    public void onDestroy(){ //Servis durdurulduğunda çağrılır
-        super.onDestroy(); // Üst sınıfın OnDestroy yöntemini çağırır
-        handler.removeCallbacks(runnable); // Runnable' nın tekrar çalışmasını engeller
-
+    public void onDestroy() {
+        super.onDestroy();
+        // Handler'daki runnable işlemi kaldırılır
+        handler.removeCallbacks(runnable);
+        // Socket.IO bağlantısı kapatılır ve olay dinleyicileri temizlenir
+        if (mSocket != null && mSocket.connected()) {
+            mSocket.disconnect();
+            mSocket.off(); // Olay dinleyicilerini temizle
+        }
     }
-
 
     @Nullable
     @Override
-    public IBinder onBind(Intent intent) { //Bound service kullanmak için gerekli method
-        return null; //Kullanmayacağımız için null döndürür
+    public IBinder onBind(Intent intent) {
+        //Bu kısımı detaylıca araştır
+        // Bu servis için binding işlemi yapılmaz
+        return null;
     }
 
-    private void createNotificationChannel(){ //Bildirim kanalı oluşturma metodu
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){ //// Android Oreo ve üstü sürümler için
-            NotificationChannel serviceChannel = new NotificationChannel( //NotifivationChannel nesnesi oluşturur
-                    CHANNEL_ID, //Kanalın ID'si
-                    "Simple Background Service Channel", //Kanal adı
-                    NotificationManager.IMPORTANCE_DEFAULT //Kanalın önemi
+    private void createNotificationChannel() {
+        // Android O ve üstü sürümlerde bildirim kanalı oluşturulması gereklidir
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel serviceChannel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Simple Background Service Channel",
+                    NotificationManager.IMPORTANCE_DEFAULT
             );
 
-            NotificationManager manager = getSystemService(NotificationManager.class); //NotificationManager sınıfından nesne oluşturluyor.
-            if (manager!=null){
-                manager.createNotificationChannel(serviceChannel); //Bildirim kanalı sisteme kaydeder
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                // Bildirim kanalı sisteme kaydedilir
+                manager.createNotificationChannel(serviceChannel);
             }
-
         }
-
-
     }
 }

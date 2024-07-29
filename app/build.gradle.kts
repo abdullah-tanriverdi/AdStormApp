@@ -33,6 +33,22 @@ android {
 
 dependencies {
 
+
+    // Gerçek zamanlı iletişim için Socket.IO istemci kütüphanesi
+    implementation("io.socket:socket.io-client:2.1.0")
+
+// Kotlin Multiplatform projeleri için Moko Socket.IO kütüphanesi
+    implementation("dev.icerock.moko:socket-io:0.3.0")
+
+// Android UI testleri için UI Automator kütüphanesi
+    implementation("androidx.test.uiautomator:uiautomator-v18:2.2.0-alpha1")
+
+// Android test yürütme izleme kütüphanesi
+    implementation("androidx.test:monitor:1.7.1")
+
+// Android Test için UI Automator kütüphanesi
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
+
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
