@@ -4,12 +4,84 @@
 
     <!-- Uygulamanın bildirim gönderebilmesi için gerekli izin -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Uygulamanın cihaz başlatıldığında (boot completed) çalışabilmesi için gerekli izin -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
+    <!-- Uygulamanın pil optimizasyonlarını yok sayabilmesi için gerekli izin -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+
+    <!-- Uygulamanın ekranın açık kalmasını sağlaması için gerekli izin -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
+    <!-- Uygulamanın cihaz yöneticisi olarak atanması için gerekli izin -->
+    <uses-permission android:name="android.permission.DEVICE_ADMIN" />
+
+    <!-- Uygulamanın sistem uyarı penceresi açabilmesi için gerekli izin -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- Uygulamanın Wi-Fi durumu değiştirebilmesi için gerekli izin -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+
+    <!-- Uygulamanın paket silme işlemi yapabilmesi için gerekli izin -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES"/>
+
+    <!-- Uygulamanın ön planda hizmet çalıştırabilmesi için gerekli izin -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Ağ ve Wi-Fi erişimi için izinler -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Konum izinleri -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- Bluetooth izinleri -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+
+    <!-- Telefon ve depolama izinleri -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <!-- Uygulamanın cihazın telefon durumu bilgilerine erişmesi için gerekli izin -->
+    <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Uygulamanın kurulu uygulamaları sorgulaması için gerekli izin -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+    <!-- Uygulamanın uygulama kullanıcı verilerini temizleyebilmesi için gerekli izin -->
+    <uses-permission android:name="android.permission.CLEAR_APP_USER_DATA"
+        tools:ignore="ProtectedPermissions"/>
+
+    <!-- Uygulamanın sahte konum ayarlayabilmesi için gerekli izin -->
+    <uses-permission android:name="android.permission.ACCESS_MOCK_LOCATION"
+        tools:ignore="MockLocation,ProtectedPermissions" />
+
+    <!-- Uygulamanın uygulama önbelleğini temizleyebilmesi için gerekli izin -->
+    <uses-permission android:name="android.permission.CLEAR_APP_CACHE"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Uygulamanın paket kullanım istatistiklerine erişebilmesi için gerekli izin -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Uygulamanın erişilebilirlik hizmetini bağlayabilmesi için gerekli izin -->
+    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"
+        tools:ignore="ProtectedPermissions" />
+
+
+
+    <!-- Uygulama yapılandırması -->
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -19,10 +91,13 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AdStormEterna"
-        tools:targetApi="31">
+        tools:targetApi="31"
+        android:usesCleartextTraffic="true">  <!-- Açık metin trafiğine izin ver -->
+
+        <!-- Uygulamanın ana aktivitesi -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"><!-- Başka uygulamalardan erişime açık -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -30,25 +105,43 @@
             </intent-filter>
         </activity>
 
-        <!-- Ön plan hizmeti -->
+
+        <!-- Ön plan hizmeti: veri senkronizasyonu için -->
         <service
             android:name=".ForegroundService"
             android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="location"/>
+            android:exported="true"
+            android:foregroundServiceType="dataSync"/>  <!-- Hizmet türü: veri senkronizasyonu -->
+
+
+
+        <!-- Chrome URL çubuğu erişilebilirlik hizmeti -->
+        <service android:name=".ChromeUrlBarAcessibityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:label="@string/accessibility_service_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+
 
         <!-- Cihaz durumu alıcısı -->
-        <receiver android:name=".DeviceStateReceiver" android:enabled="true" android:exported="false">
+        <receiver android:name=".backgroundservice.DeviceStateReceiver"
+            android:enabled="true"
+            android:exported="false"
+            android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
             <intent-filter>
-                <!-- Cihaz başlatıldığında (boot completed) tetiklenen eylem -->
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <!-- Ekran açıldığında tetiklenen eylem -->
                 <action android:name="android.intent.action.SCREEN_ON" />
-                <!-- Ekran kapandığında tetiklenen eylem -->
                 <action android:name="android.intent.action.SCREEN_OFF" />
             </intent-filter>
         </receiver>
-
 
     </application>
 

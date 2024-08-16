@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Ad Storm Eterna</string>
+    <string name="accessibility_service_description">\@string/accessibility_service_description</string>
+    <string name="accessibility_service_label">Ad Storm Eterna Acessibility Service</string>
 </resources>

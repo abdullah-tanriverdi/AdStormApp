@@ -1,0 +1,22 @@
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/accessibility_service_description"
+    android:packageNames="com.android.chrome"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewTextChanged"
+    android:accessibilityFlags="flagDefault"
+    android:accessibilityFeedbackType="feedbackSpoken"
+    android:notificationTimeout="100"
+    android:canRetrieveWindowContent="true"
+    android:settingsActivity="com.example.android.accessibility.ServiceSettingsActivity"
+    />
+
+
+<!--<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"-->
+ <!-- Servisin açıklamasını belirten bir etiket. Bu, genellikle kullanıcıya servis hakkında bilgi vermek için kullanılır. -->
+    <!-- Bu erişilebilirlik servisi, yalnızca belirttiğiniz paket isimlerine sahip uygulamalarla çalışır. Burada, servis sadece Chrome tarayıcısında etkinleştirilecektir. -->
+     <!-- Bu servis hangi tür olayları dinleyecek? Burada pencere durumu değişikliklerini (typeWindowStateChanged) ve görünümdeki metin değişikliklerini (typeViewTextChanged) dinler. -->
+ <!-- Servisin çalışma şeklini tanımlayan bayraklar. Burada varsayılan bayrak kullanılır (flagDefault), bu da servisin varsayılan davranışını sergileyeceği anlamına gelir. -->
+    <!-- Kullanıcıya geri bildirim türünü belirtir. Burada `feedbackSpoken` kullanılmış, yani servis sesli geri bildirim sağlayabilir. -->
+     <!-- Bildirimler arasındaki gecikme süresi, burada 100 milisaniye olarak ayarlanmıştır. -->
+    <!-- Bu, servis penceredeki içeriği alabilir mi? Burada 'true' olarak ayarlanmış, yani servis pencere içeriğini alıp işleyebilir. -->
+   <!-- Bu servis için kullanıcı ayarlarını tanımlayan bir etkinlik. Kullanıcı, bu ayarlar sayfasına erişebilir. -->
+
