@@ -127,7 +127,7 @@ public class ForegroundService extends Service {
         eventActions = new EventActions(deviceInfo); // Olayları işlemek için yardımcı sınıf
        // chromeCommand = new ChromeCommand(this);
 
-
+//dd
 
     }
 
